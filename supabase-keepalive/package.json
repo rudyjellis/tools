@@ -1,0 +1,22 @@
+{
+  "name": "supabase-keepalive",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that prevents Supabase free tier databases from hibernating",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "supabase",
+    "keepalive"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

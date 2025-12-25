@@ -1,0 +1,16 @@
+name = "supabase-keepalive"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Cron trigger - runs every 12 hours
+[triggers]
+crons = ["0 */12 * * *"]
+
+# Environment variables for Supabase projects
+# Add these via wrangler secret put or in the Cloudflare dashboard
+# Example:
+# [vars]
+# SUPABASE_URL_1 = "https://your-project.supabase.co"
+#
+# Secrets (add via CLI):
+# wrangler secret put SUPABASE_ANON_KEY_1
