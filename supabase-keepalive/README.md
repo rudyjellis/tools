@@ -4,11 +4,12 @@ A Cloudflare Worker that prevents Supabase free tier databases from hibernating 
 
 ## Features
 
-- Runs automatically every 12 hours via cron trigger
+- Runs automatically every 6 hours via cron trigger
 - Supports multiple Supabase projects
 - Manual HTTP trigger for testing
 - Graceful error handling (one failed project doesn't break others)
 - Detailed logging of ping results
+- Status endpoint with 24-hour history tracking
 
 ## Setup
 
@@ -71,6 +72,49 @@ npx wrangler secret put SUPABASE_ANON_KEY_3
 4. Copy the **Project URL** (e.g., `https://abc123.supabase.co`)
 5. Copy the **anon/public** key under "Project API keys"
 
+### Configure KV Namespace (for /status endpoint)
+
+The worker uses Cloudflare KV to store ping history for the status endpoint.
+
+#### Create the KV namespace:
+
+```bash
+npx wrangler kv:namespace create "KEEPALIVE_STATUS"
+```
+
+This will output something like:
+
+```
+{ binding = "KEEPALIVE_STATUS", id = "abc123..." }
+```
+
+#### Update wrangler.toml:
+
+Copy the namespace ID from the output and update `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "KEEPALIVE_STATUS"
+id = "abc123..."  # Your actual namespace ID
+```
+
+#### For local development (optional):
+
+Create a preview namespace for local testing:
+
+```bash
+npx wrangler kv:namespace create "KEEPALIVE_STATUS" --preview
+```
+
+Add the preview ID to `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "KEEPALIVE_STATUS"
+id = "your-namespace-id"
+preview_id = "your-preview-namespace-id"  # For local dev
+```
+
 ## Local Development
 
 Test the worker locally:
@@ -94,6 +138,7 @@ SUPABASE_ANON_KEY_1=your-anon-key-here
 Then visit:
 - `http://localhost:8787/` - Triggers keepalive and returns JSON results
 - `http://localhost:8787/health` - Health check endpoint
+- `http://localhost:8787/status` - View last ping results and history
 
 ### Testing the cron locally
 
@@ -106,7 +151,7 @@ npx wrangler dev --test-scheduled
 Then trigger it with:
 
 ```bash
-curl "http://localhost:8787/__scheduled?cron=0+*/12+*+*+*"
+curl "http://localhost:8787/__scheduled?cron=0+*/6+*+*+*"
 ```
 
 ## Deployment
@@ -118,7 +163,7 @@ npm run deploy
 ```
 
 After deployment, the worker will:
-- Run automatically every 12 hours
+- Run automatically every 6 hours
 - Be accessible at `https://supabase-keepalive.<your-subdomain>.workers.dev`
 
 ## Monitoring
@@ -170,6 +215,62 @@ Simple health check endpoint.
 }
 ```
 
+### GET /status
+
+Returns the status of the last keepalive run and 24-hour history summary.
+
+**Response (when data available):**
+
+```json
+{
+  "service": "supabase-keepalive",
+  "lastRun": "2025-12-26T12:00:00.000Z",
+  "nextRun": "Runs every 6 hours",
+  "status": "healthy",
+  "trigger": "cron",
+  "results": [
+    {
+      "project": "my-project",
+      "success": true,
+      "statusCode": 200,
+      "duration": 145,
+      "timestamp": "2025-12-26T12:00:00.000Z"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "succeeded": 2,
+    "failed": 0
+  },
+  "history": {
+    "available": true,
+    "runCount": 4,
+    "oldestRun": "2025-12-25T12:00:00.000Z"
+  }
+}
+```
+
+**Response (when no data yet):**
+
+```json
+{
+  "service": "supabase-keepalive",
+  "status": "no_data",
+  "message": "No ping history available yet. The worker runs every 6 hours.",
+  "nextRun": "Runs every 6 hours"
+}
+```
+
+**Status Codes:**
+- `200 OK`: All projects healthy or no data available yet
+- `503 Service Unavailable`: One or more projects failed in the last run
+
+**Features:**
+- Includes CORS headers (`Access-Control-Allow-Origin: *`) for browser access
+- Shows 24-hour history of ping runs
+- Distinguishes between cron-triggered and manual runs
+- KV storage has eventual consistency (updates may take up to 60 seconds to propagate globally)
+
 ## How It Works
 
 The worker makes a lightweight GET request to each Supabase project's REST API endpoint (`/rest/v1/`). This request:
@@ -178,7 +279,7 @@ The worker makes a lightweight GET request to each Supabase project's REST API e
 2. Registers activity with Supabase, preventing hibernation
 3. Returns quickly with minimal data transfer
 
-Free tier Supabase projects hibernate after 7 days of inactivity. By pinging every 12 hours, this worker ensures your databases stay active.
+Free tier Supabase projects hibernate after 7 days of inactivity. By pinging every 6 hours, this worker ensures your databases stay active.
 
 ## Troubleshooting
 
