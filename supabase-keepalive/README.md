@@ -1,15 +1,28 @@
 # Supabase Keepalive Worker
 
-A Cloudflare Worker that prevents Supabase free tier databases from hibernating by pinging them on a schedule.
+A Cloudflare Worker that prevents Supabase free tier databases from hibernating by executing real database queries on a schedule.
+
+## Why This Approach?
+
+Supabase tracks **database activity** to determine if a project is active. Simply pinging the REST API endpoint (`/rest/v1/`) may not count as activity. This worker queries a dedicated `keepalive` table, ensuring each request executes a real `SELECT` query that Supabase recognizes as activity.
 
 ## Features
 
+- Executes real database queries (not just API pings) to prevent hibernation
 - Runs automatically every 6 hours via cron trigger
-- Supports multiple Supabase projects
+- Supports multiple Supabase projects (up to 99)
 - Manual HTTP trigger for testing
 - Graceful error handling (one failed project doesn't break others)
-- Detailed logging of ping results
-- Status endpoint with 24-hour history tracking
+- Status endpoint with 24-hour history tracking via Cloudflare KV
+
+## Quick Start
+
+1. Install dependencies: `npm install`
+2. Login to Cloudflare: `npx wrangler login`
+3. Create the `keepalive` table in each Supabase project (see below)
+4. Add your Supabase credentials as secrets
+5. Create a KV namespace for status tracking
+6. Deploy: `npm run deploy`
 
 ## Setup
 
@@ -21,21 +34,38 @@ A Cloudflare Worker that prevents Supabase free tier databases from hibernating 
 - A Cloudflare account
 - One or more Supabase projects
 
-### Installation
-
-1. Install dependencies:
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-2. Login to Cloudflare (if not already):
+### 2. Login to Cloudflare
 
 ```bash
 npx wrangler login
 ```
 
-### Configure Supabase Projects
+### 3. Create the Keepalive Table
+
+**Required for each Supabase project.** Run this SQL in the Supabase Dashboard → SQL Editor:
+
+```sql
+-- Create the keepalive table
+CREATE TABLE public.keepalive (
+  id integer PRIMARY KEY DEFAULT 1,
+  pinged_at timestamptz DEFAULT now()
+);
+
+-- Insert a single row
+INSERT INTO public.keepalive (id) VALUES (1);
+
+-- Enable Row Level Security and allow anonymous reads
+ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anonymous read" ON public.keepalive FOR SELECT USING (true);
+```
+
+### 4. Configure Supabase Projects
 
 Add your Supabase project credentials using the Wrangler CLI. Projects are numbered starting from 1.
 
@@ -65,7 +95,7 @@ npx wrangler secret put SUPABASE_ANON_KEY_3
 # And so on...
 ```
 
-### Finding Your Supabase Credentials
+#### Finding Your Supabase Credentials
 
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select your project
@@ -73,30 +103,9 @@ npx wrangler secret put SUPABASE_ANON_KEY_3
 4. Copy the **Project URL** (e.g., `https://abc123.supabase.co`)
 5. Copy the **anon/public** key under "Project API keys"
 
-### Create the Keepalive Table
+### 5. Configure KV Namespace
 
-**Important:** You must create a `keepalive` table in each Supabase project you want to keep alive. This ensures the worker executes a real database query (not just an API ping), which is what Supabase tracks for activity.
-
-Run this SQL in the **SQL Editor** for each project:
-
-```sql
--- Create the keepalive table
-CREATE TABLE public.keepalive (
-  id integer PRIMARY KEY DEFAULT 1,
-  pinged_at timestamptz DEFAULT now()
-);
-
--- Insert a single row
-INSERT INTO public.keepalive (id) VALUES (1);
-
--- Enable Row Level Security and allow anonymous reads
-ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow anonymous read" ON public.keepalive FOR SELECT USING (true);
-```
-
-### Configure KV Namespace (for /status endpoint)
-
-The worker uses Cloudflare KV to store ping history for the status endpoint.
+The worker uses Cloudflare KV to store query history for the status endpoint.
 
 #### Create the KV namespace:
 
@@ -160,7 +169,7 @@ SUPABASE_ANON_KEY_1=your-anon-key-here
 Then visit:
 - `http://localhost:8787/` - Triggers keepalive and returns JSON results
 - `http://localhost:8787/health` - Health check endpoint
-- `http://localhost:8787/status` - View last ping results and history
+- `http://localhost:8787/status` - View last query results and history
 
 ### Testing the cron locally
 
@@ -289,7 +298,7 @@ Returns the status of the last keepalive run and 24-hour history summary.
 
 **Features:**
 - Includes CORS headers (`Access-Control-Allow-Origin: *`) for browser access
-- Shows 24-hour history of ping runs
+- Shows 24-hour history of keepalive runs
 - Distinguishes between cron-triggered and manual runs
 - KV storage has eventual consistency (updates may take up to 60 seconds to propagate globally)
 
@@ -317,7 +326,7 @@ Make sure you've added both `SUPABASE_URL_N` and `SUPABASE_ANON_KEY_N` for at le
 
 ### 404 Not Found or "relation does not exist" errors
 
-- Make sure you've created the `keepalive` table in your Supabase project (see [Create the Keepalive Table](#create-the-keepalive-table))
+- Make sure you've created the `keepalive` table in your Supabase project (see [Step 3](#3-create-the-keepalive-table))
 - Verify the RLS policy allows anonymous reads
 
 ### Network errors
