@@ -60,7 +60,17 @@ function extractProjectName(url, index) {
 
 /**
  * Pings a single Supabase project to keep it alive.
- * Makes a lightweight GET request to the REST API endpoint.
+ * Queries the keepalive table to register database activity.
+ *
+ * REQUIRED: Create the keepalive table in each Supabase project:
+ *   CREATE TABLE public.keepalive (
+ *     id integer PRIMARY KEY DEFAULT 1,
+ *     pinged_at timestamptz DEFAULT now()
+ *   );
+ *   INSERT INTO public.keepalive (id) VALUES (1);
+ *   -- Enable read access for anon role
+ *   ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+ *   CREATE POLICY "Allow anonymous read" ON public.keepalive FOR SELECT USING (true);
  *
  * @param {object} project - Project configuration
  * @returns {Promise<object>} - Ping result
@@ -69,8 +79,8 @@ async function pingProject(project) {
   const startTime = Date.now();
 
   try {
-    // Ping the REST API base endpoint - this is lightweight and registers activity
-    const response = await fetch(`${project.url}/rest/v1/`, {
+    // Query the keepalive table - this executes a real database query to prevent hibernation
+    const response = await fetch(`${project.url}/rest/v1/keepalive?select=id`, {
       method: 'GET',
       headers: {
         'apikey': project.anonKey,

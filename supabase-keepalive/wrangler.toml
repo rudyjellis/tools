@@ -9,7 +9,7 @@ crons = ["0 */6 * * *"]
 # KV namespace for storing ping history
 [[kv_namespaces]]
 binding = "KEEPALIVE_STATUS"
-id = "your-kv-namespace-id"  # Replace with actual ID from: npx wrangler kv:namespace create "KEEPALIVE_STATUS"
+id = "df62cb6076a14834ae19e3f7406d236e"
 
 # Environment variables for Supabase projects
 # Add these via wrangler secret put or in the Cloudflare dashboard

@@ -73,6 +73,27 @@ npx wrangler secret put SUPABASE_ANON_KEY_3
 4. Copy the **Project URL** (e.g., `https://abc123.supabase.co`)
 5. Copy the **anon/public** key under "Project API keys"
 
+### Create the Keepalive Table
+
+**Important:** You must create a `keepalive` table in each Supabase project you want to keep alive. This ensures the worker executes a real database query (not just an API ping), which is what Supabase tracks for activity.
+
+Run this SQL in the **SQL Editor** for each project:
+
+```sql
+-- Create the keepalive table
+CREATE TABLE public.keepalive (
+  id integer PRIMARY KEY DEFAULT 1,
+  pinged_at timestamptz DEFAULT now()
+);
+
+-- Insert a single row
+INSERT INTO public.keepalive (id) VALUES (1);
+
+-- Enable Row Level Security and allow anonymous reads
+ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anonymous read" ON public.keepalive FOR SELECT USING (true);
+```
+
 ### Configure KV Namespace (for /status endpoint)
 
 The worker uses Cloudflare KV to store ping history for the status endpoint.
@@ -274,13 +295,14 @@ Returns the status of the last keepalive run and 24-hour history summary.
 
 ## How It Works
 
-The worker makes a lightweight GET request to each Supabase project's REST API endpoint (`/rest/v1/`). This request:
+The worker queries the `keepalive` table in each Supabase project via the REST API (`/rest/v1/keepalive?select=id`). This:
 
 1. Authenticates using the project's anon key
-2. Registers activity with Supabase, preventing hibernation
-3. Returns quickly with minimal data transfer
+2. Executes a real database query (SELECT), which Supabase counts as activity
+3. Prevents hibernation by resetting the 7-day inactivity timer
+4. Returns quickly with minimal data transfer
 
-Free tier Supabase projects hibernate after 7 days of inactivity. By pinging every 6 hours, this worker ensures your databases stay active.
+Free tier Supabase projects hibernate after 7 days of inactivity. By querying the database every 6 hours, this worker ensures your projects stay active.
 
 ## Troubleshooting
 
@@ -292,6 +314,11 @@ Make sure you've added both `SUPABASE_URL_N` and `SUPABASE_ANON_KEY_N` for at le
 
 - Verify your anon key is correct
 - Check that the key hasn't been regenerated in Supabase
+
+### 404 Not Found or "relation does not exist" errors
+
+- Make sure you've created the `keepalive` table in your Supabase project (see [Create the Keepalive Table](#create-the-keepalive-table))
+- Verify the RLS policy allows anonymous reads
 
 ### Network errors
 
