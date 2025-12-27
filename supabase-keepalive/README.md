@@ -216,7 +216,7 @@ Manually triggers the keepalive check and returns results.
 ```json
 {
   "success": true,
-  "message": "Pinged 2 project(s): 2 succeeded, 0 failed",
+  "message": "Queried 2 project(s): 2 succeeded, 0 failed",
   "results": [
     {
       "project": "my-project",
@@ -287,7 +287,7 @@ Returns the status of the last keepalive run and 24-hour history summary.
 {
   "service": "supabase-keepalive",
   "status": "no_data",
-  "message": "No ping history available yet. The worker runs every 6 hours.",
+  "message": "No query history available yet. The worker runs every 6 hours.",
   "nextRun": "Runs every 6 hours"
 }
 ```

@@ -1,7 +1,7 @@
 /**
  * Supabase Keepalive Worker
  *
- * Prevents Supabase free tier databases from hibernating by pinging them on a schedule.
+ * Prevents Supabase free tier databases from hibernating by querying them on a schedule.
  * Supports multiple Supabase projects via environment variables.
  */
 
@@ -201,7 +201,7 @@ async function handleStatusEndpoint(env) {
         {
           service: 'supabase-keepalive',
           status: 'no_data',
-          message: 'No ping history available yet. The worker runs every 6 hours.',
+          message: 'No query history available yet. The worker runs every 6 hours.',
           nextRun: 'Runs every 6 hours',
         },
         null,
@@ -281,7 +281,7 @@ async function runKeepalive(env, trigger = 'unknown') {
     return resultsData;
   }
 
-  console.log(`Pinging ${projects.length} Supabase project(s)...`);
+  console.log(`Querying ${projects.length} Supabase project(s)...`);
 
   // Ping all projects concurrently
   const results = await Promise.all(projects.map(pingProject));
@@ -293,7 +293,7 @@ async function runKeepalive(env, trigger = 'unknown') {
 
   const resultsData = {
     success: failed === 0,
-    message: `Pinged ${results.length} project(s): ${succeeded} succeeded, ${failed} failed`,
+    message: `Queried ${results.length} project(s): ${succeeded} succeeded, ${failed} failed`,
     results: results,
     summary: {
       total: results.length,
