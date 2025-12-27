@@ -15,8 +15,9 @@ A Cloudflare Worker that prevents Supabase free tier databases from hibernating 
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
+- [Node.js](https://nodejs.org/) v22.18.0+ (tested with v22.18.0)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) v4.54.0+ (installed via npm)
+- npm v11.5.2+
 - A Cloudflare account
 - One or more Supabase projects
 
@@ -79,7 +80,7 @@ The worker uses Cloudflare KV to store ping history for the status endpoint.
 #### Create the KV namespace:
 
 ```bash
-npx wrangler kv:namespace create "KEEPALIVE_STATUS"
+npx wrangler kv namespace create "KEEPALIVE_STATUS"
 ```
 
 This will output something like:
@@ -103,7 +104,7 @@ id = "abc123..."  # Your actual namespace ID
 Create a preview namespace for local testing:
 
 ```bash
-npx wrangler kv:namespace create "KEEPALIVE_STATUS" --preview
+npx wrangler kv namespace create "KEEPALIVE_STATUS" --preview
 ```
 
 Add the preview ID to `wrangler.toml`:
