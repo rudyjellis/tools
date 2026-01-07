@@ -1,0 +1,7 @@
+# Cloudflare Worker development environment variables
+# Copy this file to .dev.vars and fill in your values
+# NEVER commit .dev.vars to version control
+
+# Your Anthropic API key for Claude Code
+# Get one at: https://console.anthropic.com/
+ANTHROPIC_API_KEY=sk-ant-your-api-key-here
